@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Authentication</title>
+    <title>WIngeR IT Attendance System</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -15,27 +15,30 @@
             background-color: #f0f0f0;
         }
         .container {
-            max-width: 400px;
-            width: 100%;
+            max-width: 360px;
+            width: 90%;
             padding: 20px;
             background-color: #fff;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             text-align: center;
         }
-        h1 {
+        h1, h2 {
             margin-bottom: 20px;
+            font-size: 24px;
+            color: #007bff;
         }
         input {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             margin: 10px 0;
             border: 1px solid #ccc;
             border-radius: 4px;
+            font-size: 16px;
         }
         button {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             background-color: #007bff;
             border: none;
             color: white;
@@ -58,8 +61,8 @@
         .loading-spinner {
             display: none;
             margin: 20px auto;
-            width: 50px;
-            height: 50px;
+            width: 40px;
+            height: 40px;
             border: 5px solid #f3f3f3;
             border-top: 5px solid #007bff;
             border-radius: 50%;
@@ -73,6 +76,7 @@
 </head>
 <body>
     <div class="container">
+        <h2>WIngeR IT Attendance System</h2>
         <h1 id="formTitle">Login</h1>
         <input type="email" id="email" placeholder="Email" />
         <input type="password" id="password" placeholder="Password" />
