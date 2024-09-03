@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 400px;
+            width: 100%;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            border: none;
+            color: white;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .switch {
+            margin-top: 15px;
+        }
+        .switch span {
+            color: #007bff;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .loading-spinner {
+            display: none;
+            margin: 20px auto;
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="formTitle">Login</h1>
+        <input type="email" id="email" placeholder="Email" />
+        <input type="password" id="password" placeholder="Password" />
+        <button id="actionButton">Login</button>
+        <div class="loading-spinner" id="loadingSpinner"></div>
+        <div class="switch">
+            <span id="switchText">Don't have an account? Sign Up</span>
+        </div>
+    </div>
+
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <!-- Firebase Authentication -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <!-- Firebase Realtime Database -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyA1Eu8xyx7OAQ8y4ng-Fu6phrCWJWHiYlc",
+            authDomain: "trial-b04e6.firebaseapp.com",
+            databaseURL: "https://trial-b04e6-default-rtdb.firebaseio.com",
+            projectId: "trial-b04e6",
+            storageBucket: "trial-b04e6.appspot.com",
+            messagingSenderId: "870551973559",
+            appId: "1:870551973559:web:151d8cb3f567a01109e732",
+            measurementId: "G-HM63X09XYF"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+
+        const auth = firebase.auth();
+        const database = firebase.database();
+
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const actionButton = document.getElementById('actionButton');
+        const formTitle = document.getElementById('formTitle');
+        const switchText = document.getElementById('switchText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+
+        let isLogin = true; // Start with login form
+
+        actionButton.addEventListener('click', () => {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value.trim();
+            if (email && password) {
+                getCurrentLocation().then(location => {
+                    const targetLocation = { lat: 13.068259, lng: 77.648114 };
+                    const isWithinRange = checkProximity(location, targetLocation, 100);
+                    if (isWithinRange) {
+                        if (isLogin) {
+                            login(email, password);
+                        } else {
+                            signup(email, password);
+                        }
+                    } else {
+                        alert('You are not within the allowed location range to log in.');
+                    }
+                }).catch(error => {
+                    alert('Error getting location: ' + error.message);
+                });
+            } else {
+                alert('Please enter both email and password.');
+            }
+        });
+
+        switchText.addEventListener('click', () => {
+            isLogin = !isLogin;
+            if (isLogin) {
+                formTitle.textContent = 'Login';
+                actionButton.textContent = 'Login';
+                switchText.textContent = "Don't have an account? Sign Up";
+            } else {
+                formTitle.textContent = 'Sign Up';
+                actionButton.textContent = 'Sign Up';
+                switchText.textContent = "Already have an account? Login";
+            }
+        });
+
+        async function login(email, password) {
+            try {
+                showLoadingSpinner(true);
+                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                const userRef = database.ref('users/' + user.uid);
+                const currentDeviceId = navigator.userAgent;
+
+                userRef.once('value').then(async (snapshot) => {
+                    const userData = snapshot.val();
+
+                    if (userData && userData.deviceId !== currentDeviceId) {
+                        alert('This account is already signed in from another device.');
+                        await auth.signOut();
+                    } else {
+                        const timeData = await fetchTimeFromAPI();
+                        checkAttendance(user, timeData);
+                    }
+                    showLoadingSpinner(false);
+                });
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Error: ' + error.message);
+                showLoadingSpinner(false);
+            }
+        }
+
+        async function signup(email, password) {
+            try {
+                showLoadingSpinner(true);
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                const userRef = database.ref('users/' + user.uid);
+                const currentDeviceId = navigator.userAgent;
+
+                await userRef.set({
+                    deviceId: currentDeviceId
+                });
+
+                alert('Signup successful!');
+                showLoadingSpinner(false);
+            } catch (error) {
+                console.error('Signup error:', error);
+                alert('Error: ' + error.message);
+                showLoadingSpinner(false);
+            }
+        }
+
+        async function fetchTimeFromAPI() {
+            try {
+                const response = await fetch('http://worldtimeapi.org/api/ip');
+                const data = await response.json();
+                return {
+                    date: data.datetime.split('T')[0],
+                    time: data.datetime.split('T')[1].split('.')[0]
+                };
+            } catch (error) {
+                console.error('Error fetching time:', error);
+                const now = new Date();
+                return {
+                    date: now.toISOString().split('T')[0],
+                    time: now.toTimeString().split(' ')[0]
+                };
+            }
+        }
+
+        function checkAttendance(user, timeData) {
+            const email = user.email.replace(/\./g, '_'); // Replacing '.' with '_' to use as a key in Firebase
+            const attendanceRef = database.ref('attendance/' + email + '/' + timeData.date);
+
+            attendanceRef.once('value').then((snapshot) => {
+                if (snapshot.exists()) {
+                    alert('Already logged in today.');
+                } else {
+                    const loginTime = new Date(`1970-01-01T${timeData.time}`);
+                    const cutoffTime = new Date('1970-01-01T09:45:00');
+
+                    const status = loginTime > cutoffTime ? 'Late' : 'Present';
+                    logAttendance(user, timeData, status);
+                    alert('Login successful!');
+                }
+                showLoadingSpinner(false);
+            }).catch((error) => {
+                console.error('Error checking attendance:', error);
+                alert('Error: ' + error.message);
+                showLoadingSpinner(false);
+            });
+        }
+
+        function logAttendance(user, timeData, status) {
+            const email = user.email.replace(/\./g, '_'); // Replacing '.' with '_' to use as a key in Firebase
+            const attendanceRef = database.ref('attendance/' + email + '/' + timeData.date);
+
+            attendanceRef.set({
+                date: timeData.date,
+                name: user.email,
+                status: status,
+                time: timeData.time
+            });
+        }
+
+        function showLoadingSpinner(show) {
+            loadingSpinner.style.display = show ? 'block' : 'none';
+            actionButton.disabled = show;
+        }
+
+        // Get current location
+        function getCurrentLocation() {
+            return new Promise((resolve, reject) => {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            resolve({
+                                lat: position.coords.latitude,
+                                lng: position.coords.longitude
+                            });
+                        },
+                        (error) => reject(error)
+                    );
+                } else {
+                    reject(new Error('Geolocation is not supported by this browser.'));
+                }
+            });
+        }
+
+        // Calculate the distance between two coordinates (in meters)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Earth radius in meters
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c;
+        }
+
+        // Check if the user is within a certain range of the target location
+        function checkProximity(currentLocation, targetLocation, maxDistance) {
+            const distance = calculateDistance(
+                currentLocation.lat,
+                currentLocation.lng,
+                targetLocation.lat,
+                targetLocation.lng
+            );
+            return distance <= maxDistance;
+        }
+    </script>
+</body>
+</html>
